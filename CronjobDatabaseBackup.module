@@ -159,10 +159,16 @@ class CronjobDatabaseBackup extends Process implements ConfigurableModule {
         $f->addOptions(array(
             0 => __('never'),
             //'every30Seconds' =>__('30 seconds'), // for development use
-            'everyDay' =>__('1 day'),
-            'everyWeek' =>__('1 week'),
-            'every2Weeks' =>__('2 weeks'),
-            'every4Weeks' =>__('4 weeks'),
+            'every15Minutes' =>__('15 Minutes'),
+            'everyHour'      =>__('1 Hour'),
+            'every4Hours'    =>__('4 Hours'),
+            'every12Hours'   =>__('12 Hours'),
+            'everyDay'       =>__('1 day'),
+            'every2Days'     =>__('2 days'),
+            'every4Days'     =>__('4 days'),
+            'everyWeek'      =>__('1 week'),
+            'every2Weeks'    =>__('2 weeks'),
+            'every4Weeks'    =>__('4 weeks'),
         ));
         if(isset($_POST['cycle']) && $_POST['cycle'] != $data['cycle']) $f->message(__('Backup cycle interval changed to').' '.$_POST['cycle']);
         $f->value = $data['cycle'];
