@@ -100,7 +100,7 @@ class CronjobDatabaseBackup extends Process implements ConfigurableModule {
      * Hookable filename generator.
      *
      * By default this generates a filename with an incrementing version number embedded before the .sql extension.
-     * Hook 'CronjobDatabaseBackup::generateFileanme' and set the event's 'return' value if you wish to change the
+     * Hook 'CronjobDatabaseBackup::generateFilename' and set the event's 'return' value if you wish to change the
      * naming scheme.
      */
     public function ___generateFilename($path, $filename) {
