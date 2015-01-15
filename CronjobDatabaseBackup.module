@@ -95,26 +95,44 @@ class CronjobDatabaseBackup extends Process implements ConfigurableModule {
         return $path;
     }
 
+
+    /**
+     * Hookable filename generator.
+     *
+     * By default this generates a filename with an incrementing version number embedded before the .sql extension.
+     * Hook 'CronjobDatabaseBackup::generateFileanme' and set the event's 'return' value if you wish to change the
+     * naming scheme.
+     */
+    public function ___generateFilename($path, $filename) {
+        $matches   = array();
+        $_filename = $filename;
+        $filename .= '.sql';
+
+        if (preg_match('/^(.+)-(\d+)$/', $_filename, $matches)) {
+            $_filename = $matches[1];
+            $n = $matches[2];
+        } else {
+            $n = 0;
+        }
+
+        while(file_exists($path . $filename)) {
+            $filename = $_filename . "-" . (++$n) . ".sql";
+        }
+
+        return $filename;
+    }
+
+
     /**
      * hooky dooky
      *
      */
     public function cronBackup(HookEvent $e) {
         $allTables = $this->backup->getAllTables();
-        $database = $this->wire('database');
-
-        $filename = ($this->backup_name)?$this->backup_name:$this->wire('config')->dbName;
-        $_filename = $filename;
-        $filename .= '.sql';
-        if(preg_match('/^(.+)-(\d+)$/', $_filename, $matches)) {
-            $_filename = $matches[1];
-            $n = $matches[2];
-        } else {
-            $n = 0;
-        }
-        while(file_exists($this->backupPath() . $filename)) {
-            $filename = $_filename . "-" . (++$n) . ".sql";
-        }
+        $database  = $this->wire('database');
+        $path      = $this->backupPath();
+        $basename  = ($this->backup_name) ? $this->backup_name : $this->wire('config')->dbName;
+        $filename  = $this->generateFilename($path, $basename);
 
         $fileinfo = $this->_("This backup was made by 'Cronjob Database Backup Module'");
         $options = array(
@@ -133,7 +151,7 @@ class CronjobDatabaseBackup extends Process implements ConfigurableModule {
 
         $file = $this->backup->backup($options);
         $message = $this->_("cronjob saved db-backup - PATH[").$file.']';
-        $this->message($message,Notice::logOnly);
+        $this->message($message, Notice::logOnly);
     }
 
     /**
