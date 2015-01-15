@@ -2,17 +2,17 @@
 
 /**
  * ProcessWire Module Cronjob Database Backup
- * 
+ *
  * made by kixe (Christoph Thelen) 05.11.14
  * Licensed under GNU/GPL v3
  *
  * some code taken from Ryans Module Database Backups (Thanks!)
  *
  * Database Backups
- * ProcessWire 2.x 
- * Copyright (C) 2014 by Ryan Cramer 
+ * ProcessWire 2.x
+ * Copyright (C) 2014 by Ryan Cramer
  * Licensed under GNU/GPL v2, see LICENSE.TXT
- * 
+ *
  * http://processwire.com
  *
  *
@@ -20,206 +20,206 @@
 
 class CronjobDatabaseBackup extends Process implements ConfigurableModule {
 
-	public static function getModuleInfo() {
+    public static function getModuleInfo() {
 
-		$infoArray = array(
-			'title' => __('Cronjob Database Backup'), 
-			'version' => 102,
-			'summary' => __("Periodic automatic backup of the database. Set interval in settings."),
-			'autoload' => true,
-			'singular' => true,
-			'author' => 'kixe',
-			'license' => 'GNU-GPLv3',
-			'permission' => 'db-backup', // loggedin User must have this permission
-			'hreflicense' => 'http://www.gnu.org/licenses/gpl-3.0.html',
-			'requires' => array('LazyCron','ProcessWire>=2.4.15'), // bug in ProcessModule.module (no line-breaks here!)
-			'icon' => 'database'
-		);
-		
-		$perminfo = __('Manage database backups (recommended for superuser only)');
-		if(!wire('modules')->isInstalled('ProcessDatabaseBackups')) $infoArray['permissions'] = array('db-backup' => $perminfo);
-		return $infoArray;
-	}
+        $infoArray = array(
+            'title' => __('Cronjob Database Backup'),
+            'version' => 102,
+            'summary' => __("Periodic automatic backup of the database. Set interval in settings."),
+            'autoload' => true,
+            'singular' => true,
+            'author' => 'kixe',
+            'license' => 'GNU-GPLv3',
+            'permission' => 'db-backup', // loggedin User must have this permission
+            'hreflicense' => 'http://www.gnu.org/licenses/gpl-3.0.html',
+            'requires' => array('LazyCron','ProcessWire>=2.4.15'), // bug in ProcessModule.module (no line-breaks here!)
+            'icon' => 'database'
+        );
+
+        $perminfo = __('Manage database backups (recommended for superuser only)');
+        if(!wire('modules')->isInstalled('ProcessDatabaseBackups')) $infoArray['permissions'] = array('db-backup' => $perminfo);
+        return $infoArray;
+    }
 
 
-	static public function getDefaultConfig() {
-		return array(
-			'cycle' => 'every4Weeks', // default set to 4 weeks
-			'backup_all' => 1,
-			'backup_name' => null,
-			'field_storage_path' => null,
-			'tables' => null
-		);
-	}
+    static public function getDefaultConfig() {
+        return array(
+            'cycle' => 'every4Weeks', // default set to 4 weeks
+            'backup_all' => 1,
+            'backup_name' => null,
+            'field_storage_path' => null,
+            'tables' => null
+        );
+    }
 
-	public function __construct() {
-		foreach(self::getDefaultConfig() as $key => $value) {
-			$this->$key = $value;
-		}
-	}
+    public function __construct() {
+        foreach(self::getDefaultConfig() as $key => $value) {
+            $this->$key = $value;
+        }
+    }
 
-	protected $backup = null;
+    protected $backup = null;
 
-	/**
-	* Initialize
-	* hooks in Lazy Cron
-	* set interval of script execution here
-	* check syntax of hookable time functions in wire/modules/LazyCron.module
-	*
-	*/
-	public function init() {
-		$this->backup = $this->wire('database')->backups(); //WireDatabaseBackup Class
-		if ($this->field_storage_path && $this->checkPath($this->wire('config')->paths->root.$this->field_storage_path)) $this->backup->setPath($this->wire('config')->paths->root.ltrim($this->field_storage_path,"/"));
-		if ($this->cycle) {
-			$this->addHook("LazyCron::{$this->cycle}", $this, 'cronBackup');
-		}
-		parent::init();
-	}
-	
-	/**
-	* checks wether a path exists or not - don't mind about leading or trailing slash
-	* @return bool
-	*/
-	public function checkPath($path) {
-		if($path && is_dir(ltrim($path,"/")) && is_writable(ltrim($path,"/"))) return true;
-		return false;
-	}
+    /**
+     * Initialize
+     * hooks in Lazy Cron
+     * set interval of script execution here
+     * check syntax of hookable time functions in wire/modules/LazyCron.module
+     *
+     */
+    public function init() {
+        $this->backup = $this->wire('database')->backups(); //WireDatabaseBackup Class
+        if ($this->field_storage_path && $this->checkPath($this->wire('config')->paths->root.$this->field_storage_path)) $this->backup->setPath($this->wire('config')->paths->root.ltrim($this->field_storage_path,"/"));
+        if ($this->cycle) {
+            $this->addHook("LazyCron::{$this->cycle}", $this, 'cronBackup');
+        }
+        parent::init();
+    }
 
-	/**
-	* made by Ryan
-	*
-	*/
-	protected function backupPath($short = false) {
-		$path = $this->backup->getPath();
-		if($short) $path = str_replace($this->wire('config')->paths->root, '/', $path); 
-		return $path;
-	}
+    /**
+     * checks wether a path exists or not - don't mind about leading or trailing slash
+     * @return bool
+     */
+    public function checkPath($path) {
+        if($path && is_dir(ltrim($path,"/")) && is_writable(ltrim($path,"/"))) return true;
+        return false;
+    }
 
-	/**
-	* hooky dooky
-	*
-	*/
-	public function cronBackup(HookEvent $e) {
-		$allTables = $this->backup->getAllTables();
-		$database = $this->wire('database'); 
+    /**
+     * made by Ryan
+     *
+     */
+    protected function backupPath($short = false) {
+        $path = $this->backup->getPath();
+        if($short) $path = str_replace($this->wire('config')->paths->root, '/', $path);
+        return $path;
+    }
 
-		$filename = ($this->backup_name)?$this->backup_name:$this->wire('config')->dbName;
-		$_filename = $filename; 
-		$filename .= '.sql';
-		if(preg_match('/^(.+)-(\d+)$/', $_filename, $matches)) {
-			$_filename = $matches[1]; 
-			$n = $matches[2];
-		} else {
-			$n = 0; 
-		}
-		while(file_exists($this->backupPath() . $filename)) {
-			$filename = $_filename . "-" . (++$n) . ".sql";
-		}
+    /**
+     * hooky dooky
+     *
+     */
+    public function cronBackup(HookEvent $e) {
+        $allTables = $this->backup->getAllTables();
+        $database = $this->wire('database');
 
-		$fileinfo = $this->_("This backup was made by 'Cronjob Database Backup Module'");
-		$options = array(
-			'filename' => $filename, 
-			'description' => $fileinfo
-			); 
+        $filename = ($this->backup_name)?$this->backup_name:$this->wire('config')->dbName;
+        $_filename = $filename;
+        $filename .= '.sql';
+        if(preg_match('/^(.+)-(\d+)$/', $_filename, $matches)) {
+            $_filename = $matches[1];
+            $n = $matches[2];
+        } else {
+            $n = 0;
+        }
+        while(file_exists($this->backupPath() . $filename)) {
+            $filename = $_filename . "-" . (++$n) . ".sql";
+        }
 
-		if(!$this->backup_all) {
-			// selective tables
-			$options['tables'] = array();
-			foreach($this->tables as $table) {
-				if(!isset($allTables[$table])) continue; 
-				$options['tables'][] = $allTables[$table];
-			}
-		}
+        $fileinfo = $this->_("This backup was made by 'Cronjob Database Backup Module'");
+        $options = array(
+            'filename' => $filename,
+            'description' => $fileinfo
+        );
 
-		$file = $this->backup->backup($options); 
-		$message = $this->_("cronjob saved db-backup - PATH[").$file.']';
-		$this->message($message,Notice::logOnly);
-	}
+        if(!$this->backup_all) {
+            // selective tables
+            $options['tables'] = array();
+            foreach($this->tables as $table) {
+                if(!isset($allTables[$table])) continue;
+                $options['tables'][] = $allTables[$table];
+            }
+        }
 
-	/**
-	 * module settings
-	 *
-	 */
-	static public function getModuleConfigInputfields(array $data) {
+        $file = $this->backup->backup($options);
+        $message = $this->_("cronjob saved db-backup - PATH[").$file.']';
+        $this->message($message,Notice::logOnly);
+    }
 
-		$fields = new InputfieldWrapper();
-		$modules = wire('modules');
-		$database = wire('database');
-		$config = wire('config');
-		$defaults = self::getDefaultConfig();
-		$data = array_merge($defaults, $data);
- 
+    /**
+     * module settings
+     *
+     */
+    static public function getModuleConfigInputfields(array $data) {
+
+        $fields = new InputfieldWrapper();
+        $modules = wire('modules');
+        $database = wire('database');
+        $config = wire('config');
+        $defaults = self::getDefaultConfig();
+        $data = array_merge($defaults, $data);
+
         $f = $modules->get("InputfieldSelect");
         $f->attr('name', 'cycle');
-		$f->label = __("Backup Cycle Interval");
-		//$f->icon = 'history'; 
- 		$f->icon = 'refresh'; 
+        $f->label = __("Backup Cycle Interval");
+        //$f->icon = 'history';
+        $f->icon = 'refresh';
         $f->description = __("Select a time interval for automated database backups. Choose 'never' to disable");
         $f->notes = __("The cronjob to backup your database executes only if current user has db-backup permission.");
-		$f->addOptions(array(
-			0 => __('never'),
-			//'every30Seconds' =>__('30 seconds'), // for development use
-			'everyDay' =>__('1 day'),
-			'everyWeek' =>__('1 week'),
-			'every2Weeks' =>__('2 weeks'),
-			'every4Weeks' =>__('4 weeks'),
-            ));
+        $f->addOptions(array(
+            0 => __('never'),
+            //'every30Seconds' =>__('30 seconds'), // for development use
+            'everyDay' =>__('1 day'),
+            'everyWeek' =>__('1 week'),
+            'every2Weeks' =>__('2 weeks'),
+            'every4Weeks' =>__('4 weeks'),
+        ));
         if(isset($_POST['cycle']) && $_POST['cycle'] != $data['cycle']) $f->message(__('Backup cycle interval changed to').' '.$_POST['cycle']);
-		$f->value = $data['cycle'];
- 		$fields->add($f);
+        $f->value = $data['cycle'];
+        $fields->add($f);
 
-		$def = $config->dbName;
-		$f = $modules->get('InputfieldName'); 
-		$f->attr('name', 'backup_name');
-		$f->set('collapsed',$data['backup_name']?false:true);
-		$f->set('required', false);
-		$f->icon = 'file-o'; 
-		$f->label = __('Backup Name'); 
-		$f->description = __('This will be used as the backup filename. Extension .sql will be added automatically.'); 
-		$f->notes = __('If omitted the name of the database will be used (config). Anyway a unique filename will be automatically generated: [name]-[n].sql.'); 
-		$f->value = $data['backup_name'];
-		$fields->add($f); 
+        $def = $config->dbName;
+        $f = $modules->get('InputfieldName');
+        $f->attr('name', 'backup_name');
+        $f->set('collapsed',$data['backup_name']?false:true);
+        $f->set('required', false);
+        $f->icon = 'file-o';
+        $f->label = __('Backup Name');
+        $f->description = __('This will be used as the backup filename. Extension .sql will be added automatically.');
+        $f->notes = __('If omitted the name of the database will be used (config). Anyway a unique filename will be automatically generated: [name]-[n].sql.');
+        $f->value = $data['backup_name'];
+        $fields->add($f);
 
-		$def = str_replace($config->paths->root,'',$database->backups()->getPath());
-		$f = $modules->get('InputfieldText'); 
-		$f->attr('name', 'field_storage_path');
-		$f->set('collapsed',$data['field_storage_path']?false:true);
-		$f->set('required', false);
-		$f->icon = 'folder-open-o'; 
-		$f->label = __('Storage Path'); 
-		$f->description = __("Path to custom storage directory.");
-		$f->notes = __("Leave this blank for storage under default path: $def");
-		if(!count($_POST) && $data['field_storage_path'] && !is_dir($config->paths->root.ltrim($data['field_storage_path'],"/"))) $f->error("Path doesn't exist! Default pass will be used.");
-		elseif(!count($_POST) && $data['field_storage_path'] && !is_writable($config->paths->root.ltrim($data['field_storage_path'],"/"))) $f->error("Path isn't writable! Default pass will be used.");
-		$f->value = $data['field_storage_path'];
-		$fields->add($f);
+        $def = str_replace($config->paths->root,'',$database->backups()->getPath());
+        $f = $modules->get('InputfieldText');
+        $f->attr('name', 'field_storage_path');
+        $f->set('collapsed',$data['field_storage_path']?false:true);
+        $f->set('required', false);
+        $f->icon = 'folder-open-o';
+        $f->label = __('Storage Path');
+        $f->description = __("Path to custom storage directory.");
+        $f->notes = __("Leave this blank for storage under default path: $def");
+        if(!count($_POST) && $data['field_storage_path'] && !is_dir($config->paths->root.ltrim($data['field_storage_path'],"/"))) $f->error("Path doesn't exist! Default pass will be used.");
+        elseif(!count($_POST) && $data['field_storage_path'] && !is_writable($config->paths->root.ltrim($data['field_storage_path'],"/"))) $f->error("Path isn't writable! Default pass will be used.");
+        $f->value = $data['field_storage_path'];
+        $fields->add($f);
 
-		$f = $modules->get('InputfieldCheckbox');
-		$f->attr('name', 'backup_all'); 
-		$f->label = __('Backup all?'); 
+        $f = $modules->get('InputfieldCheckbox');
+        $f->attr('name', 'backup_all');
+        $f->label = __('Backup all?');
         $f->attr('checked', $data['backup_all'] ? 'checked' : '' );
         $f->notes = __('Uncheck to make a selection');
-		$fields->add($f);
+        $fields->add($f);
 
-		$f = $modules->get('InputfieldSelectMultiple'); 
-		$f->attr('name', 'tables');
-		$f->icon = 'table'; 
-		$f->label = __('Data Tables'); 
-		$f->description = __('By default, the export will include all data tables. If you only want certain tables to be included in the backup file, select them below.'); 
-		$allTables = $database->backups()->getAllTables();
-		foreach($allTables as $table) $f->addOption($table, $table); 
-		$f->attr('value', $data['tables']?$data['tables']:$allTables); 
-		$f->showIf = 'backup_all=0';
-		$fields->add($f);
+        $f = $modules->get('InputfieldSelectMultiple');
+        $f->attr('name', 'tables');
+        $f->icon = 'table';
+        $f->label = __('Data Tables');
+        $f->description = __('By default, the export will include all data tables. If you only want certain tables to be included in the backup file, select them below.');
+        $allTables = $database->backups()->getAllTables();
+        foreach($allTables as $table) $f->addOption($table, $table);
+        $f->attr('value', $data['tables']?$data['tables']:$allTables);
+        $f->showIf = 'backup_all=0';
+        $fields->add($f);
 
-		return $fields;
-	}
+        return $fields;
+    }
 
-	public function ___uninstall() {
-		$userpath = ($this->data['field_storage_path'])?"] and in [".trim($this->data['field_storage_path'],'/'):"";
-		$defpath = $this->backupPath(true);
-		$this->error(sprintf(__("Please note that maybe backup files remain in folder [%s%s]. If you don't want them there, please remove them manually."),$defpath,$userpath),Notice::warning); 
-		if ($this->wire('modules')->isInstalled('ProcessDatabaseBackups')) $this->message(__('Module \'Process Database Backups\' remains installed'));
-		parent::___uninstall();
-	}
+    public function ___uninstall() {
+        $userpath = ($this->data['field_storage_path'])?"] and in [".trim($this->data['field_storage_path'],'/'):"";
+        $defpath = $this->backupPath(true);
+        $this->error(sprintf(__("Please note that maybe backup files remain in folder [%s%s]. If you don't want them there, please remove them manually."),$defpath,$userpath),Notice::warning);
+        if ($this->wire('modules')->isInstalled('ProcessDatabaseBackups')) $this->message(__('Module \'Process Database Backups\' remains installed'));
+        parent::___uninstall();
+    }
 }
